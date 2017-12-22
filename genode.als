@@ -1,5 +1,6 @@
 module genode
 
+// Note that this combines Genode's state AND the kernel state
 sig State {
   kos : set KernelObject,
   pds : set PDom,
@@ -8,15 +9,24 @@ sig State {
   all pd1, pd2 : pds | pd1.cspace_map = pd2.cspace_map => pd1 = pd2
 }
 
+abstract sig Object {}
+
 sig CapId {}
 
-sig KernelObject {} { all s : State | this in s.kos }
+sig KernelObject extends Object {} {
+  all s : State | this in s.kos
+}
 sig CSpace extends KernelObject {
   cap_slots : CapId -> lone KernelObject
+} {
+  // CSpaces references cannot form cycles
+  let trans = {cs1, cs2 : CSpace |
+                 some c : CapId | cs1.@cap_slots[c] = cs2}
+  | this !in this.^trans
 }
 sig IdentityObject extends KernelObject {}
 
-sig GenodeObject {} {
+sig GenodeObject extends Object {} {
   all s : State | some pd : s.pds | this in pd.objs
 }
 sig RPCObject extends GenodeObject {
@@ -30,14 +40,9 @@ sig PDom {
   all s : State | this in s.pds
 }
 
-fact GenodeAssms {
-  all r1, r2 : RPCObject, i : IdentityObject |
-    r1.owns = i && r2.owns != i
-}
-
 pred example {}
 
-run example for 2
+run example for 5 but exactly 1 State, exactly 2 PDom, 3 CapId
 
 pred create_RPCObject [
     s, s' : State,

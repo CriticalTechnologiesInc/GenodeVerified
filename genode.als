@@ -1,20 +1,26 @@
 module genode
 
+// FIXME: A capability unambiguously refers to an RPC object [Genode Book 3.1.1]
+
+// Represents a protection domain
+sig PDom {}
+
 abstract sig Object {}
+abstract sig GenodeObject extends Object {}
+sig KernelObject extends Object {}
+
+// Represents a capability identifier (e.g. an integer)
+sig CapId {}
 
 // Note that this combines Genode's state AND the kernel state
 sig State {
-  kos : set KernelObject,
-  pds : set PDom,
+  k_objs : set KernelObject,
+  // genode objects are not shared between protection domains [assumption]
+  g_objs : PDom one-> set GenodeObject,
+  g_caps : PDom -> set CapId,
+  // Genode maintains a one-to-one correspondence between protection domains
+  // and CSpaces [assumption]
   cspace_map : PDom one->one CSpace
-} 
-
-fun PDom.cspace : CSpace { this.~pds.cspace_map[this] }
-
-sig CapId {}
-
-sig KernelObject extends Object {} {
-  some s : State | this in s.kos // no floating kernel objects
 }
 
 // Cap space contains a finite number of slots, each of which may contain a
@@ -34,13 +40,8 @@ sig IdentityObject extends KernelObject {} {
     lone owner
     // Each owned identity object must have an entry reachable from its owner's
     // cspace [assumption]
-    one owner => some c : CapId | owner.~objs.cspace.cap_slots[c] = this
+    one owner => all s : State | some c : CapId | owner.~(s.g_objs).cspace.cap_slots[c] = this
   }
-}
-
-abstract sig GenodeObject extends Object {} {
-  // Genode objects exist in at most one protection domain at a time
-  all s : State | lone pd : s.pds | this in pd.objs
 }
 
 // An RPC object provides an RPC interface [Genode Book 3.1.1]
@@ -48,27 +49,16 @@ sig RPCObject extends GenodeObject {
   owns : one IdentityObject
 }
 
-sig PDom {
-  objs : set GenodeObject,
-  caps : set CapId
-} {
-  some s : State | this in s.pds // no floating protection domains
-  // A capability unambiguously refers to an RPC object [Genode Book 3.1.1]
-  some c : caps | some o : RPCObject {
-    o.owns = this.cspace.cap_slots[c]
-  }
-}
-
 pred example {}
 run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object,
   exactly 3 RPCObject
 
-pred modifies [s, s' : State, ks, ks' : set KernelObject), ps, ps' : set PDom] {
+/*pred modifies [s, s' : State, ks, ks' : set KernelObject, ps, ps' : set PDom] {
   s'.kos = (s.kos - ks) + ks'
   s'.pds = (s.pds - ps) + ps'
-}
+}*/
 
-pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
+/*pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
 // Preconditions
   this != target // a PDom cannot delegate to itself
   r in this.objs // can only delegate capabilities to an owned RPCObject
@@ -83,4 +73,4 @@ pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
   }
 }
 
-run delegate for 3 but 2 State, 5 Object
+run delegate for 3 but 2 State, 5 Object*/

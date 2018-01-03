@@ -63,6 +63,11 @@ pred example {}
 run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object,
   exactly 3 RPCObject
 
+pred modifies [s, s' : State, ks, ks' : set KernelObject), ps, ps' : set PDom] {
+  s'.kos = (s.kos - ks) + ks'
+  s'.pds = (s.pds - ps) + ps'
+}
+
 pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
 // Preconditions
   this != target // a PDom cannot delegate to itself

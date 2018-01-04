@@ -1,7 +1,5 @@
 module genode
 
-// FIXME: A capability unambiguously refers to an RPC object [Genode Book 3.1.1]
-
 // Represents a protection domain
 sig PDom {}
 
@@ -21,6 +19,12 @@ sig State {
   // Genode maintains a one-to-one correspondence between protection domains
   // and CSpaces [assumption]
   cspace_map : PDom one->one CSpace
+}
+
+// A  capability unambiguously refers to an RPC object [Genode Book 3.1.1]
+fact {
+  all s : State, p : PDom, c : s.g_caps[p] |
+    one o : RPCObject | o.live[s] && o.owns[s] = s.cspace_map[p].cap_slots[c]
 }
 
 // this kernel object is live in s
@@ -52,7 +56,8 @@ sig IdentityObject extends KernelObject {} {
     // Each owned identity object must have an entry reachable from its owner's
     // cspace [assumption]
     one owner <=> this.live[s] &&
-      (let pd = owner.~(s.g_objs) | pd.can_access[s, this])
+      (let pd = owner.~(s.g_objs), cs = s.cspace_map[pd] |
+        some c : CapId | {c -> this} in cs.cap_slots)
   }
 }
 
@@ -62,8 +67,7 @@ sig RPCObject extends GenodeObject {
 }
 
 pred example {}
-run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object,
-  exactly 3 RPCObject
+run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object
 
 /*pred modifies [s, s' : State, ks, ks' : set KernelObject, ps, ps' : set PDom] {
   s'.kos = (s.kos - ks) + ks'

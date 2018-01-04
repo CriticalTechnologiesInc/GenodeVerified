@@ -23,6 +23,17 @@ sig State {
   cspace_map : PDom one->one CSpace
 }
 
+// this kernel object is live in s
+pred KernelObject.live [s : State] { this in s.k_objs }
+
+// this Genode object is live in s
+pred GenodeObject.live [s : State] { some this.~(s.g_objs) }
+
+// this protection domain can access k in s using a capability
+pred PDom.can_access [s : State, k : KernelObject] {
+  some c : s.g_caps[this] | {c -> k} in s.cspace_map[this].cap_slots
+}
+
 // Cap space contains a finite number of slots, each of which may contain a
 // capability [Genode Book 3.1.1]
 sig CSpace extends KernelObject {
@@ -34,19 +45,20 @@ sig CSpace extends KernelObject {
 // An identity object represents an RPC object in the kernel
 // [Genode Book 3.1.1]
 sig IdentityObject extends KernelObject {} {
-  let owner = this.~owns {
+  all s : State | let owner = {o : RPCObject | this in o.owns[s]} {
     // Each identity object can have only one owner
     // [implied, Genode Book 3.1.1]
     lone owner
     // Each owned identity object must have an entry reachable from its owner's
     // cspace [assumption]
-    one owner => all s : State | some c : CapId | owner.~(s.g_objs).cspace.cap_slots[c] = this
+    one owner <=> this.live[s] &&
+      (let pd = owner.~(s.g_objs) | pd.can_access[s, this])
   }
 }
 
 // An RPC object provides an RPC interface [Genode Book 3.1.1]
 sig RPCObject extends GenodeObject {
-  owns : one IdentityObject
+  owns : State ->one IdentityObject
 }
 
 pred example {}

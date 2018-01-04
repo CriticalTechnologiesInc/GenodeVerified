@@ -35,6 +35,7 @@ pred GenodeObject.live [s : State] { some this.~(s.g_objs) }
 
 // this protection domain can access o in s using a capability
 pred PDom.can_access [s : State, o : RPCObject] {
+  o.live[s]
   some c : s.g_caps[this] | {c -> o.owns[s]} in s.cspace_map[this].cap_slots
 }
 
@@ -66,12 +67,17 @@ sig RPCObject extends GenodeObject {
   owns : State ->one IdentityObject
 }
 
+assert ownsLive {
+  all s : State, i : IdentityObject, o : RPCObject |
+    o.live[s] && o.owns[s] = i => i.live[s]
+}
+
 pred example {}
 run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object
 
 pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
 // Preconditions
-  this != target // a PDom cannot delegate to itself
+  //this != target // a PDom cannot delegate to itself
   r.live[s] // r must be live
   r in s.g_objs[this] // can only delegate capabilities to an owned RPCObject
   c !in s.g_caps[target] // target is given a new capability ID

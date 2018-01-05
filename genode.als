@@ -21,24 +21,30 @@ sig State {
   cspace_map : PDom one->one CSpace
 }
 
-fun PDom.cspace [s : State] : CSpace { s.cspace_map[this] }
-
-// A  capability unambiguously refers to an RPC object [Genode Book 3.1.1]
-fact {
-  all s : State, p : PDom, c : s.g_caps[p] |
-    one o : RPCObject | o.live[s] && o.owns = s.cspace_map[p].cap_slots[c]
-}
-
 // this kernel object is live in s
 pred KernelObject.live [s : State] { this in s.k_objs }
 
 // this Genode object is live in s
-pred GenodeObject.live [s : State] { some this.~(s.g_objs) }
+pred GenodeObject.live [s : State] { some pd : PDom | this in s.g_objs[pd] }
+
+fun PDom.cspace [s : State] : CSpace { s.cspace_map[this] }
 
 // this protection domain can access o in s using a capability
 pred PDom.can_access [s : State, o : RPCObject] {
   o.live[s]
   some c : s.g_caps[this] | {c -> o.owns} in s.cspace_map[this].cap_slots
+}
+
+// A  capability unambiguously refers to an RPC object [Genode Book 3.1.1]
+fact {
+  all s : State, p : PDom, c : s.g_caps[p] |
+    one o : RPCObject | o.owns = s.cspace_map[p].cap_slots[c]
+}
+
+// All live identity objects have a live owner, and vice-versa [assumption]
+fact {
+  all s : State, o : RPCObject, i : IdentityObject |
+    o.owns = i => (o.live[s] <=> i.live[s])
 }
 
 // Cap space contains a finite number of slots, each of which may contain a
@@ -58,7 +64,7 @@ sig IdentityObject extends KernelObject {} {
     lone owner
     // Each owned identity object must have an entry reachable from its owner's
     // cspace [assumption]
-    one owner <=> this.live[s] &&
+    (one owner && this.live[s]) =>
       (let pd = owner.~(s.g_objs), cs = s.cspace_map[pd] |
         some c : CapId | {c -> this} in cs.cap_slots)
   }
@@ -67,11 +73,6 @@ sig IdentityObject extends KernelObject {} {
 // An RPC object provides an RPC interface [Genode Book 3.1.1]
 sig RPCObject extends GenodeObject {
   owns : one IdentityObject
-}
-
-assert ownsLive {
-  all s : State, i : IdentityObject, o : RPCObject |
-    o.live[s] && o.owns = i => i.live[s]
 }
 
 pred example {}
@@ -110,8 +111,7 @@ pred RPCObject.destroy [s, s' : State, pd : PDom] {
 // Genode Operations
   s'.g_objs = s.g_objs - {pd -> this} // destroy the RPC object
   // delete capabilities in this PD for the identity object
-  s'.g_caps = s.g_caps -
-    {pd -> {c : CapId | pd.cspace[s].cap_slots[c] = this.owns}}
+  s'.g_caps = s.g_caps :> {c : CapId | pd.cspace[s].cap_slots[c] != this.owns}
 // Kernel Operations
   s'.k_objs = s.k_objs - this.owns // destroy the identity object
   // remove all cspace references to the identity object
@@ -119,4 +119,4 @@ pred RPCObject.destroy [s, s' : State, pd : PDom] {
     :> {k : KernelObject | k != this.owns}
 }
 
-run destroy for 5 but 2 State, exactly 2 PDom // test
+run destroy for 5 but 2 State // test

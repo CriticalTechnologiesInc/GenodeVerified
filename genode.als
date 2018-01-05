@@ -24,7 +24,7 @@ sig State {
 // A  capability unambiguously refers to an RPC object [Genode Book 3.1.1]
 fact {
   all s : State, p : PDom, c : s.g_caps[p] |
-    one o : RPCObject | o.live[s] && o.owns[s] = s.cspace_map[p].cap_slots[c]
+    one o : RPCObject | o.live[s] && o.owns = s.cspace_map[p].cap_slots[c]
 }
 
 // this kernel object is live in s
@@ -36,7 +36,7 @@ pred GenodeObject.live [s : State] { some this.~(s.g_objs) }
 // this protection domain can access o in s using a capability
 pred PDom.can_access [s : State, o : RPCObject] {
   o.live[s]
-  some c : s.g_caps[this] | {c -> o.owns[s]} in s.cspace_map[this].cap_slots
+  some c : s.g_caps[this] | {c -> o.owns} in s.cspace_map[this].cap_slots
 }
 
 // Cap space contains a finite number of slots, each of which may contain a
@@ -50,7 +50,7 @@ sig CSpace extends KernelObject {
 // An identity object represents an RPC object in the kernel
 // [Genode Book 3.1.1]
 sig IdentityObject extends KernelObject {} {
-  all s : State | let owner = {o : RPCObject | this in o.owns[s]} {
+  all s : State | let owner = {o : RPCObject | this in o.owns} {
     // Each identity object can have only one owner
     // [implied, Genode Book 3.1.1]
     lone owner
@@ -64,12 +64,12 @@ sig IdentityObject extends KernelObject {} {
 
 // An RPC object provides an RPC interface [Genode Book 3.1.1]
 sig RPCObject extends GenodeObject {
-  owns : State ->one IdentityObject
+  owns : one IdentityObject
 }
 
 assert ownsLive {
   all s : State, i : IdentityObject, o : RPCObject |
-    o.live[s] && o.owns[s] = i => i.live[s]
+    o.live[s] && o.owns = i => i.live[s]
 }
 
 pred example {}
@@ -77,8 +77,6 @@ run example for 3 but exactly 1 State, exactly 2 PDom, 10 Object
 
 pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
 // Preconditions
-  //this != target // a PDom cannot delegate to itself
-  r.live[s] // r must be live
   r in s.g_objs[this] // can only delegate capabilities to an owned RPCObject
   c !in s.g_caps[target] // target is given a new capability ID
 // Invariants
@@ -87,10 +85,10 @@ pred PDom.delegate [s, s' : State, r : RPCObject, target : PDom, c : CapId] {
   s'.k_objs = s.k_objs
 // Operations
   s'.g_caps = s.g_caps ++ (target -> (s.g_caps[target] + c))
-  s'.cspace_map[target].cap_slots = s.cspace_map[target].cap_slots ++ {c -> r.owns[s]}
+  s'.cspace_map[target].cap_slots = s.cspace_map[target].cap_slots ++ {c -> r.owns}
 }
 
-run delegate for 5 but 2 State, 2 PDom // test
+run delegate for 5 but 2 State, exactly 2 PDom // test
 
 delegateOkay : check {
   all s, s' : State, r : RPCObject, source, target : PDom, c : CapId |

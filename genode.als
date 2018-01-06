@@ -14,7 +14,7 @@ sig CapId {}
 sig State {
   k_objs : set KernelObject,
   // genode objects are not shared between protection domains [assumption]
-  g_objs : PDom one-> set GenodeObject,
+  g_objs : PDom lone-> set GenodeObject,
   g_caps : PDom -> set CapId,
   // Genode maintains a one-to-one correspondence between protection domains
   // and CSpaces [assumption]
@@ -108,15 +108,18 @@ pred RPCObject.destroy [s, s' : State, pd : PDom] {
   this in s.g_objs[pd]
 // Invariants
   s'.cspace_map = s.cspace_map
+
+  let i = this.owns {
 // Genode Operations
   s'.g_objs = s.g_objs - {pd -> this} // destroy the RPC object
   // delete capabilities in this PD for the identity object
-  s'.g_caps = s.g_caps :> {c : CapId | pd.cspace[s].cap_slots[c] != this.owns}
+  s'.g_caps = s.g_caps :> {c : CapId | pd.cspace[s].cap_slots[c] != i}
 // Kernel Operations
-  s'.k_objs = s.k_objs - this.owns // destroy the identity object
+  s'.k_objs = s.k_objs - i // destroy the identity object
   // remove all cspace references to the identity object
   all p : PDom | p.cspace[s'].cap_slots = p.cspace[s].cap_slots
-    :> {k : KernelObject | k != this.owns}
+    :> {k : KernelObject | k != i}
+  }
 }
 
 run destroy for 5 but 2 State // test

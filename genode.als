@@ -3,6 +3,9 @@ module genode
 // Represents a protection domain
 sig PDom {}
 
+// Represents a capability identifier (e.g. an integer)
+sig CapId {}
+
 abstract sig Object {}
 abstract sig GenodeObject extends Object {}
 sig KernelObject extends Object {}
@@ -10,8 +13,24 @@ sig KernelObject extends Object {}
 // capability [Genode Book 3.1.1]
 sig CSpace extends KernelObject {}
 
-// Represents a capability identifier (e.g. an integer)
-sig CapId {}
+// An RPC object provides an RPC interface [Genode Book 3.1.1]
+sig RPCObject extends GenodeObject {
+  owns : one IdentityObject
+}
+// An identity object represents an RPC object in the kernel
+// [Genode Book 3.1.1]
+sig IdentityObject extends KernelObject {} {
+  let owner = {o : RPCObject | this in o.owns} {
+    // Each identity object can have only one owner
+    // [implied, Genode Book 3.1.1]
+    lone owner
+    // Each owned identity object must have an entry reachable from its owner's
+    // cspace [assumption]
+    all s : State | (one owner && this.live[s]) =>
+      (let pd = owner.~(s.g_objs), cs = pd.cspace |
+        some c : CapId | {c -> this} in s.cap_slots[cs])
+  }
+}
 
 // Immutable state
 one sig ImmutState {
@@ -36,7 +55,6 @@ sig State {
 
 // this kernel object is live in s
 pred KernelObject.live [s : State] { this in s.k_objs }
-
 // this Genode object is live in s
 pred GenodeObject.live [s : State] { some pd : PDom | this in s.g_objs[pd] }
 
@@ -53,37 +71,15 @@ fact {
   all s : State, p : PDom, c : s.g_caps[p] |
     one o : RPCObject | o.owns = s.cap_slots[p.cspace][c]
 }
-
 // All live identity objects have a live owner, and vice-versa [assumption]
 fact {
   all s : State, o : RPCObject, i : IdentityObject |
     o.owns = i => (o.live[s] <=> i.live[s])
 }
-
 // All capabilities in cap slots refer to live kernel objects [assumption]
 fact {
   all s : State, cs : CSpace, c : CapId, k : KernelObject |
     cs.live[s] => {c -> k} in s.cap_slots[cs] => k.live[s]
-}
-
-// An identity object represents an RPC object in the kernel
-// [Genode Book 3.1.1]
-sig IdentityObject extends KernelObject {} {
-  let owner = {o : RPCObject | this in o.owns} {
-    // Each identity object can have only one owner
-    // [implied, Genode Book 3.1.1]
-    lone owner
-    // Each owned identity object must have an entry reachable from its owner's
-    // cspace [assumption]
-    all s : State | (one owner && this.live[s]) =>
-      (let pd = owner.~(s.g_objs), cs = pd.cspace |
-        some c : CapId | {c -> this} in s.cap_slots[cs])
-  }
-}
-
-// An RPC object provides an RPC interface [Genode Book 3.1.1]
-sig RPCObject extends GenodeObject {
-  owns : one IdentityObject
 }
 
 pred example {}

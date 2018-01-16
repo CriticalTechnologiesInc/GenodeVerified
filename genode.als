@@ -42,7 +42,6 @@ fun cs_map : PDom -> CSpace { {is : ImmutState}.cspace_map }
 
 // Note that this combines Genode's state AND the kernel state
 sig State {
-  k_objs : set KernelObject,
   // genode objects are not shared between protection domains [assumption]
   g_objs : PDom lone-> set GenodeObject,
   g_caps : PDom -> set CapId,
@@ -54,7 +53,10 @@ sig State {
 }
 
 // this kernel object is live in s
-pred KernelObject.live [s : State] { this in s.k_objs }
+pred KernelObject.live [s : State] {
+  some pd : PDom | (this in cs_map[pd] ||
+    some c : CapId | this in s.cap_slots[cs_map[pd]][c])
+}
 // this Genode object is live in s
 pred GenodeObject.live [s : State] { some pd : PDom | this in s.g_objs[pd] }
 
@@ -92,7 +94,6 @@ pred RPCObject.delegate [s, s' : State, src, dst : PDom, c : CapId] {
   c !in s.g_caps[dst] // target is given a new capability ID
 // Invariants
   s'.g_objs = s.g_objs
-  s'.k_objs = s.k_objs
 // Genode Operations
   // add the capability to the target's protection domain
   s'.g_caps = s.g_caps ++ {dst -> {s.g_caps[dst] + c}}
@@ -119,7 +120,6 @@ pred RPCObject.destroy [s, s' : State] {
     // delete capabilities in this PD for the identity object
     s'.g_caps = s.g_caps :> {c : CapId | s.cap_slots[pd.cspace][c] != i}
   // Kernel Operations
-    s'.k_objs = s.k_objs - i // destroy the identity object0
     // remove all cspace references to the identity object
     all p : PDom | s'.cap_slots[p.cspace] = s.cap_slots[p.cspace] :> {univ - i}
   }

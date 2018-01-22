@@ -22,9 +22,15 @@ abstract sig StateEP {}
 one sig SendEP in StateEP {}
 one sig RecvEP in StateEP {}
 
+sig CNodeIndex {}
+
 sig KernelObject {}
 sig Endpoint extends KernelObject {}
-sig TCB extends KernelObject {}
+sig TCB extends KernelObject {
+  // The root CNode (forms the CSpace) is immutable [assumption]
+  root_cnode : one CNode
+}
+sig CNode extends KernelObject {}
 
 // [S. 18, p. 85-86] We assume capabilities are immutable
 abstract sig Cap {}
@@ -34,6 +40,8 @@ sig EndpointCap extends Cap {
 }
 
 sig State {
-  // [S. 18.2, p. 18] An endpoint is idle when its set of TCBs is empty
-  ep_state : Endpoint one-> (StateEP one->set TCB)
+  // [S. 18.2, p. 88] An endpoint is idle when its set of TCBs is empty
+  ep_state : Endpoint -> (StateEP one->set TCB)
+  // [S. 18, p. 86]
+  cnode_state : CNode -> (CNodeIndex one->lone Cap)
 }

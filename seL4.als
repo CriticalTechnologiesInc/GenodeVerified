@@ -41,7 +41,13 @@ sig EndpointCap extends Cap {
 
 sig State {
   // [S. 18.2, p. 88] An endpoint is idle when its set of TCBs is empty
-  ep_state : Endpoint -> (StateEP one->set TCB)
+  ep_state : Endpoint ->one StateEP,
+  ep_waiting : Endpoint lone->set TCB, // each TCB can wait on only 1 endpoint
   // [S. 18, p. 86]
-  cnode_state : CNode -> (CNodeIndex one->lone Cap)
+  cnode_state : CNode -> (CNodeIndex ->lone Cap)
 }
+
+pred example {
+  all c : EndpointCap | AllowRead !in c.cap_rights && AllowWrite in c.cap_rights
+}
+run example for 5 but exactly 1 State, exactly 2 TCB, exactly 3 EndpointCap

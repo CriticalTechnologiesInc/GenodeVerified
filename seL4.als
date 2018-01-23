@@ -38,6 +38,9 @@ sig EndpointCap extends Cap {
   obj_ref : one Endpoint, // we're assuming type safety here
   cap_rights : set AccessRight
 }
+sig CNodeCap extends Cap {
+  obj_ref : one CNode
+}
 
 sig State {
   // [S. 18.2, p. 88] An endpoint is idle when its set of TCBs is empty

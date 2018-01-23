@@ -92,10 +92,11 @@ fun TCB.caps[s : State] : set Cap {
 }
 
 pred TCB.possesses_cap_to_object[s : State, k : KernelObject] {
-  some c : this.caps[s] |
+  some c : this.caps[s] {
     // NOTE: This must enumerate all subtypes of Cap!
-    (c in EndpointCap => some c.cap_rights => k = c.(EndpointCap<:obj_ref)) &&
-    (c in CNodeCap => k = c.(CNodeCap<:obj_ref))
+    c in EndpointCap => some c.cap_rights => k = c.(EndpointCap<:obj_ref)
+    c in CNodeCap => k = c.(CNodeCap<:obj_ref)
+  }
 }
 
 pred example1 {

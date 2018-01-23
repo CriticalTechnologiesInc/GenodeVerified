@@ -13,14 +13,14 @@ module seL4
 
 // [S. 14, p. 67]
 abstract sig AccessRight {}
-one sig AllowRead in AccessRight {}
-one sig AllowWrite in AccessRight {}
-one sig AllowGrant in AccessRight {}
+one sig AllowRead extends AccessRight {}
+one sig AllowWrite extends AccessRight {}
+one sig AllowGrant extends AccessRight {}
 
 // [S. 18.2, p. 89]
 abstract sig StateEP {}
-one sig SendEP in StateEP {}
-one sig RecvEP in StateEP {}
+one sig SendEP extends StateEP {}
+one sig RecvEP extends StateEP {}
 
 sig CNodeIndex {}
 

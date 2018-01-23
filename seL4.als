@@ -47,7 +47,14 @@ sig State {
   ep_state : Endpoint ->one StateEP,
   ep_waiting : Endpoint lone->set TCB, // each TCB can wait on only 1 endpoint
   // [S. 18, p. 86]
-  cnode_map : CNode -> (CNodeIndex ->lone Cap)
+  cnode_map : CNode -> (CNodeIndex ->lone Cap),
+  // [S. 18.3, p. 91] mapping from capabilities to parents
+  cdt : (CNode -> CNodeIndex) ->lone (CNode -> CNodeIndex)
+} {
+  // CNode slots in the CDT must be non-empty (assumption)
+  all cn, cn' : CNode, i, i' : CNodeIndex |
+    ({cn -> i} -> {cn' -> i'}) in cdt
+       => some cnode_map[cn][i] && some cnode_map[cn'][i]
 }
 
 pred example {
@@ -55,7 +62,7 @@ pred example {
 }
 run example for 5 but exactly 1 State, exactly 2 TCB, exactly 3 EndpointCap
 
-// Returns the set of CNodes reachable from this CNode in 's'
+// Returns the set of CNodes reachable from this CNode in 's' (non-reflexive)
 fun CNode.reachable [s : State] : set CNode {
   let trans = {cn, cn' : CNode
     | some i : CNodeIndex | let c' = s.cnode_map[cn][i]
@@ -63,7 +70,19 @@ fun CNode.reachable [s : State] : set CNode {
   | {cnode : CNode | cnode in this.^trans}
 }
 
+// [CITEME]
 fact CNode_Acyclic { all s : State, cn : CNode | cn !in cn.reachable[s] }
+
+// Whether 'c' is derived from this Cap in the CDT (non-reflexive)
+pred Cap.derived_from [s : State, c : Cap] {
+  let trans = {ca, ca' : Cap | some cn, cn' : CNode, i, i' : CNodeIndex |
+    ca = s.cnode_map[cn][i] && ca' = s.cnode_map[cn'][i'] &&
+    s.cdt[cn][i] = {cn' -> i'}}
+  | c in this.^trans
+}
+
+// [CITEME]
+fact CDT_Acyclic { all s : State, c : Cap | not c.derived_from[s, c] }
 
 // set of Caps possessed by this TCB
 fun TCB.caps[s : State] : set Cap {

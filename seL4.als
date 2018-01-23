@@ -28,7 +28,7 @@ sig KernelObject {}
 sig Endpoint extends KernelObject {}
 sig TCB extends KernelObject {
   // The root CNode (forms the CSpace) is immutable [assumption]
-  root_cnode : one CNode
+  ctable : one CNodeCap
 }
 sig CNode extends KernelObject {}
 
@@ -44,10 +44,39 @@ sig State {
   ep_state : Endpoint ->one StateEP,
   ep_waiting : Endpoint lone->set TCB, // each TCB can wait on only 1 endpoint
   // [S. 18, p. 86]
-  cnode_state : CNode -> (CNodeIndex ->lone Cap)
+  cnode_map : CNode -> (CNodeIndex ->lone Cap)
 }
 
 pred example {
   all c : EndpointCap | AllowRead !in c.cap_rights && AllowWrite in c.cap_rights
 }
 run example for 5 but exactly 1 State, exactly 2 TCB, exactly 3 EndpointCap
+
+// Returns the set of CNodes reachable from this CNode in 's'
+fun CNode.reachable [s : State] : set CNode {
+  let trans = {cn, cn' : CNode
+    | some i : CNodeIndex | let c' = s.cnode_map[cn][i]
+    | c' in CNodeCap && c'.obj_ref = cn'}
+  | {cnode : CNode | cnode in this.^trans}
+}
+
+fact CNode_Acyclic { all s : State, cn : CNode | cn !in cn.reachable[s] }
+
+// set of Caps possessed by this TCB
+fun TCB.caps[s : State] : set Cap {
+  this.ctable +
+    {c : Cap | some i : CNodeIndex, cn : this.ctable.obj_ref.reachable[s]
+               | {i -> c} in s.cnode_map[cn]}
+}
+
+pred TCB.possesses_cap_to_object[s : State, k : KernelObject] {
+  some c : this.caps[s] |
+    // NOTE: This must enumerate all subtypes of Cap!
+    (c in EndpointCap => some c.cap_rights => k = c.(EndpointCap<:obj_ref)) &&
+    (c in CNodeCap => k = c.(CNodeCap<:obj_ref))
+}
+
+pred example1 {
+  some t : TCB, s : State, e : Endpoint | t.possesses_cap_to_object[s, e]
+}
+run example1 for 5 but exactly 1 State, 2 CNodeIndex
